@@ -1,0 +1,137 @@
+diff --git a/Assets/Scripts/InteractionSystem/ConciergeObject.cs b/Assets/Scripts/InteractionSystem/ConciergeObject.cs
+index d8279aeff894ee1089dec579bfa2b8649c9faba0..6238abee534a02ace863bbea26ec933d98fdbd32 100644
+--- a/Assets/Scripts/InteractionSystem/ConciergeObject.cs
++++ b/Assets/Scripts/InteractionSystem/ConciergeObject.cs
+@@ -1,37 +1,73 @@
+ using System;
+ using UnityEngine;
+ 
+ [RequireComponent(typeof(Collider))]
+ public class ConciergeObject : MonoBehaviour, IInteractable
+ {
+     public DoorController doorController;
+     public GameObject ConciergeUI; // scene canvas object
+ 
+-    private void Reset()
++    private void Awake()
+     {
+-        // Ensure collider is trigger or something so player can interact
++        AutoAssignMissingReferences();
++    }
++
++    private void OnValidate()
++    {
++        AutoAssignMissingReferences();
++    }
++
++    private void AutoAssignMissingReferences()
++    {
++        if (doorController == null)
++            doorController = Object.FindFirstObjectByType<DoorController>();
++
++        if (ConciergeUI == null)
++        {
++            var doorUI = FindDoorUIIncludingInactive();
++            if (doorUI != null)
++            {
++                var canvas = doorUI.GetComponentInParent<Canvas>(true);
++                ConciergeUI = canvas != null ? canvas.gameObject : doorUI.gameObject;
++            }
++        }
++    }
++
++    private static DoorUI FindDoorUIIncludingInactive()
++    {
++        var allDoorUIs = Resources.FindObjectsOfTypeAll<DoorUI>();
++        foreach (var ui in allDoorUIs)
++        {
++            if (ui == null) continue;
++            if (!ui.gameObject.scene.IsValid()) continue;
++            return ui;
++        }
++        return null;
+     }
+ 
+     public void Interact(PlayerStateMachine player)
+     {
++        if (player == null) return;
++
++        AutoAssignMissingReferences();
++
+         if (doorController == null) { Debug.LogError("[ConciergeObject] No DoorController"); return; }
+         if (ConciergeUI == null) { Debug.LogError("[ConciergeObject] ConciergeUI (scene) not assigned"); return; }
+ 
+         Transform cameraPoint = doorController.peekCameraPoint != null ? doorController.peekCameraPoint : doorController.puzzleCameraPoint;
+ 
+-        // create callbacks: opened = enable canvas and let DoorUI refresh; closed = hide canvas
+         Action opened = () =>
+         {
+             ConciergeUI.SetActive(true);
+-            var doorUI = ConciergeUI.GetComponentInChildren<DoorUI>();
+-            if (doorUI != null) doorUI.Refresh(); //   
++            var doorUI = ConciergeUI.GetComponentInChildren<DoorUI>(true);
++            if (doorUI != null) doorUI.Refresh();
+         };
+ 
+         Action closed = () =>
+         {
+             ConciergeUI.SetActive(false);
+         };
+ 
+         player.PushState(new PlayerConciergeState(player, cameraPoint, doorController, 0.35f, opened, closed));
+     }
+-}
+\ No newline at end of file
++}
+diff --git a/Assets/Scripts/InteractionSystem/InteractionSystem.cs b/Assets/Scripts/InteractionSystem/InteractionSystem.cs
+index 379480d39afb4461aea0f85ecce7bf3cdb81d3e3..0ba623c91e72b06d2c80d2b3bf6c650596d0098b 100644
+--- a/Assets/Scripts/InteractionSystem/InteractionSystem.cs
++++ b/Assets/Scripts/InteractionSystem/InteractionSystem.cs
+@@ -1,23 +1,43 @@
++using System;
+ using UnityEngine;
+ 
+ public static class InteractionSystem
+ {
+     public static float interactDistance = 3f;
++    public static LayerMask interactLayerMask = ~0;
++    public static QueryTriggerInteraction triggerInteraction = QueryTriggerInteraction.Collide;
+ 
+     public static void TryInteract(Transform player)
+     {
+         var cam = Camera.main;
+         if (cam == null) return;
++        if (player == null) return;
++
+         Ray ray = new Ray(cam.transform.position, cam.transform.forward);
++        var hits = Physics.RaycastAll(ray, interactDistance, interactLayerMask, triggerInteraction);
++        if (hits == null || hits.Length == 0) return;
++
++        Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
++
++        var playerSM = player.GetComponent<PlayerStateMachine>();
++        if (playerSM == null) return;
+ 
+-        if (Physics.Raycast(ray, out RaycastHit hit, interactDistance))
++        foreach (var hit in hits)
+         {
++            if (hit.collider == null) continue;
++
+             var interactable = hit.collider.GetComponentInParent<IInteractable>();
++            if (interactable == null)
++                interactable = hit.collider.GetComponent<IInteractable>();
++
+             if (interactable != null)
+             {
+-                var playerSM = player.GetComponent<PlayerStateMachine>();
+                 interactable.Interact(playerSM);
++                return;
+             }
+         }
++
++        // Useful in level debugging: ray hit something but there is no interactable component.
++        Debug.Log("[InteractionSystem] Ray hit colliders, but no IInteractable was found on them.");
+     }
+-}
+\ No newline at end of file
++}
