@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 70e7984dd5d36494e8e676af5c8614ae, type: 3}
+  m_Name: VisitorDayTest
+  m_EditorClassIdentifier: Assembly-CSharp::VisitorDay
+  fixedVisitors:
+  - {fileID: 11400000, guid: b9d1e5f126ce00d4086161c97bf47a3c, type: 2}
+  randomPool:
+  - {fileID: 11400000, guid: 4c2d41b930351bb4689088495b636721, type: 2}
+  - {fileID: 11400000, guid: bc5f57080d447284f97bd9a3f6eaec44, type: 2}
+  totalVisitors: 3
